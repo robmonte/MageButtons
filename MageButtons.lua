@@ -369,13 +369,37 @@ function addon:makeBaseButtons()
 	mouseover = MageButtons:getSV("mouseover", "mouseover") or 0
 
 	local keybindTable = {"MAGEBUTTONS_BUTTON1", "MAGEBUTTONS_BUTTON2", "MAGEBUTTONS_BUTTON3", "MAGEBUTTONS_BUTTON4", "MAGEBUTTONS_BUTTON5", "MAGEBUTTONS_BUTTON6"}
-	
+
+	local RUNE_OF_TELEPORTATION = 17031
+	local RUNE_OF_PORTALS = 17032
+	local reagentIds = {}
+	reagentIds[RUNE_OF_PORTALS] = true
+	reagentIds[RUNE_OF_TELEPORTATION] = true
+	local reagentCounts = {}
+	reagentCounts[RUNE_OF_PORTALS] = 0
+	reagentCounts[RUNE_OF_TELEPORTATION] = 0
+	for bagId = BACKPACK_CONTAINER, BACKPACK_CONTAINER + NUM_BAG_SLOTS, 1 do
+		local numSlotsInBag = GetContainerNumSlots(bagId)
+		for slotId = 0, numSlotsInBag, 1 do
+			local itemId = GetContainerItemID(bagId, slotId)
+			local _, itemCount, _, _, _, _, _, _, _, _ = GetContainerItemInfo(bagId, slotId)
+			if reagentIds[itemId] then
+				reagentCounts[itemId] = reagentCounts[itemId] + itemCount
+			end
+		end
+	end
+	local baseSpellToReagentCount = {
+		Teleports = reagentCounts[RUNE_OF_TELEPORTATION],
+		Portals = reagentCounts[RUNE_OF_PORTALS],
+	}
+
 	local j = 0
 	for j = 1, #createButtonMenu, 1 do
 		--createItem = createButtonMenu[j]
 		local btnType = createButtonMenu[j]
 		local baseSpell = baseSpells[btnType]
 		local spellCount = spellCounts[btnType]
+		local reagentCount = baseSpellToReagentCount[btnType]
 		--local keybind = "U"
 
 		if baseSpell ~= nil and baseSpell ~= "none" then
@@ -457,11 +481,18 @@ function addon:makeBaseButtons()
 					MageButtons:hideButtons(btnType, spellCount)
 				end
 			end)
-			
+
+			if reagentCount ~= nil then
+				baseButton.Text = baseButton:CreateFontString(nil, "ARTWORK")
+				baseButton.Text:SetFontObject(NumberFontNormal)
+				baseButton.Text:SetText(("%d"):format(reagentCount))
+				baseButton.Text:Show()
+				baseButton.Text:ClearAllPoints()
+				baseButton.Text:SetPoint("BOTTOMRIGHT", baseButton, "BOTTOMRIGHT")
+			end
+
 			-- Store the button in a table for easy access
 			baseButtons[btnType] = baseButton
-
-
 
 			-- Hide the background if it already exits
 			if baseButtonBackdrops[btnType] then
