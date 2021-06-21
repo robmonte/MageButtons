@@ -437,7 +437,7 @@ function addon:makeBaseButtons()
 			--print(GetBindingKey(keybindTable[j]))
 			if GetBindingKey(keybindTable[j]) ~= nil then
 				--print("bound")
-				keybind = GetBindingKey(keybindTable[j])
+				local keybind = GetBindingKey(keybindTable[j])
 				SetBindingClick(keybind, baseButton:GetName());
 			end
 			
