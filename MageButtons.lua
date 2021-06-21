@@ -106,138 +106,145 @@ local btnSize = 0
 
 local spellNames = {}
 
+local function make_spell_table(spell_id_list)
+  local tbl = {}
+  --print(spell_id_list)
+
+  for i = 1, #spell_id_list, 1 do
+    if IsSpellKnown(spell_id_list[i]) then
+      local name = GetSpellInfo(spell_id_list[i])
+      local subtext = GetSpellSubtext(spell_id_list[i]) or ''  -- NOTE will return nil at first unless its locally cached
+      name = name .. "(" .. subtext .. ")"  -- For some reason the "()" are required for tooltips
+      table.insert(tbl, name)
+    end
+  end
+
+  return tbl
+end
+
+local function preload_spell_data(spell_id_list)
+    for k = 1, #spell_id_list, 1 do
+        C_Spell.RequestLoadSpellData(spell_id_list[k])
+    end
+end
+
 --------------
 --- Events ---
 --------------
-local function onevent(self, event, arg1, ...)
+local function onevent(self, event, addonName, ...)
+    if (addonName ~= "MageButtons" or  event ~= "ADDON_LOADED") then
+        return
+    end
 	--print(event)
-	
-	-- Stuff to do after addon is loaded
-	if(event == "ADDON_LOADED" and arg1 == "MageButtons") then	
 
-		-- Needs a slight delay on initial startup, don't know why
-		C_Timer.After(6, function()
-			
-			
-			-- Set up lists of spells
-			WaterSpells = {5504, 5505, 5506, 6127, 10138, 10139, 10140, 37420, 43987, 27090}
-			FoodSpells = {587, 597, 990, 6129, 10144, 10145, 28612, 33717}
-			TelportsSpells = {}
-			PortalsSpells = {}
-			if UnitFactionGroup("player") == "Alliance" then
-				TeleportsSpells = {3565, 3561, 3562, 32271, 49359, 33690}
-				PortalsSpells = {11419, 10059, 11416, 32266, 49360, 33691}
-			else
-				TeleportsSpells = {3566, 3563, 3567, 32272, 49358, 35715}
-				PortalsSpells = {11420, 11418, 11417, 32267, 49361, 35717}
-			end
-			GemsSpells = {759, 3552, 10053, 10054, 27101}
-			
-			if IsSpellKnown(12826) then sheep = 12826
-			elseif IsSpellKnown(12825) then sheep = 12825
-			elseif IsSpellKnown(12824) then sheep = 12824
-			elseif IsSpellKnown(118) then sheep = 118
-			else sheep = 9999 end
-			PolymorphSpells = {sheep, 28272, 28271, 28270}
-			
-			
-			local spellTables = {}
-			spellTables["Water"] = {5504, 5505, 5506, 6127, 10138, 10139, 10140}
-			spellTables["Food"] = {587, 597, 990, 6129, 10144, 10145, 28612}
-			if UnitFactionGroup("player") == "Alliance" then
-				spellTables["Teleports"] = {3565, 3561, 3562}
-				spellTables["Portals"] = {11419, 10059, 11416}
-			else
-				spellTables["Teleports"] = {3566, 3563, 3567}
-				spellTables["Portals"] = {11420, 11418, 11417}
-			end
-			spellTables["Gems"] = {759, 3552, 10053, 10054}
-			spellTables["Polymorph"] = {sheep, 28272, 28271, 28270}
-			
-			----------------------------------------
-			-- Create tables from the spell lists --
-			----------------------------------------
-			for k = 1, #buttonTypes, 1 do
-				local btnType = buttonTypes[k]
-				
-				-- For each type of spell in buttonTypes table
-				--   get number of spells
-				--   create table of that type with spells that are known (trained)
-				if btnType ~= nil and btnType ~= "none" then
+	-- Set up lists of spells
+    -- Bottom <--> Top
+	WaterSpells = {5504, 5505, 5506, 6127, 10138, 10139, 10140, 37420, 43987, 27090}
+	FoodSpells  = {587, 597, 990, 6129, 10144, 10145, 28612, 33717}
+	TeleportSpells = {}
+	PortalSpells  = {}
 
-					local obj2 = btnType .. [[Table = {}
-					for i = 1, #]] .. btnType .. [[Spells, 1 do
-						if IsSpellKnown(]] .. btnType .. [[Spells[i]) then
-							local ]] .. btnType .. [[Name = GetSpellInfo(]] .. btnType .. [[Spells[i]) .. "(" .. GetSpellSubtext(]] .. btnType .. [[Spells[i]) .. ")"
-							--]] .. btnType .. [[Table[i] = ]] .. btnType .. [[Name
-							table.insert(]] .. btnType .. [[Table, ]] .. btnType .. [[Name)
-						end
-					end	]]
-					
-					-- execute the above command
-					local cmdRun2 = assert(loadstring(obj2))
-					cmdRun2()
-				end
-			end
-			
-			-- Get saved frame location
-			local relPoint, anchorX, anchorY = addon:getAnchorPosition()
-			MageButtonsConfig:ClearAllPoints()
-			MageButtonsConfig:SetPoint(relPoint, UIParent, relPoint, anchorX, anchorY)
-			
-			
-
-			addon:makeBaseButtons()
-
-			-----------------
-			-- Data Broker --
-			-----------------
-			lockStatus = addon:getSV("framelock", "lock")
-			
-			db = LibStub("AceDB-3.0"):New("MageButtonsDB", SettingsDefaults)
-			MageButtonsDB.db = db;
-			MageButtonsMinimapData = ldb:NewDataObject("MageButtons",{
-				type = "data source",
-				text = "MageButtons",
-				icon = "Interface/Icons/Spell_Holy_MagicalSentry.blp",
-				OnClick = function(self, button)
-					if button == "RightButton" then
-						if IsShiftKeyDown() then
-							MageButtons:maptoggle("0")
-							print("MageButtons: Hiding icon, re-enable with: /MageButtons minimap 1")
-						else
-							InterfaceOptionsFrame_OpenToCategory(mbPanel)
-							InterfaceOptionsFrame_OpenToCategory(mbPanel)
-							InterfaceOptionsFrame_OpenToCategory(mbPanel)
-						end
-					
-					elseif button == "LeftButton" then
-						if lockStatus == 0 then
-							-- Not locked, lock it and save the anchor position
-							addon:lockAnchor()
-						else
-							-- locked, unlock
-							addon:unlockAnchor()
-						end
-					end
-				end,
-				
-				-- Minimap Icon tooltip
-				OnTooltipShow = function(tooltip)
-					tooltip:AddLine("|cffffffffMageButtons|r\nLeft-click to lock/unlock.\nRight-click to configure.\nShift+Right-click to hide minimap button.")
-				end,
-			})
-			
-			-- display the minimap icon?
-			local mmap = addon:getSV("minimap", "icon") or 1
-			if mmap == 1 then
-				MageButtonsMinimapIcon:Register("mageButtonsIcon", MageButtonsMinimapData, MageButtonsDB)
-				addon:maptoggle(1)
-			else
-				addon:maptoggle(0)
-			end
-		end); --end of 1 second delay
+	if UnitFactionGroup("player") == "Alliance" then
+              -- Darnassus (3565), Exodar (32271), Theramore (49359), Ironforge (3562), Stormwind (3561), Shattrath (33690)
+		TeleportSpells = {3565, 32271, 49359, 3562, 3561, 33690} -- {3565, 3561, 3562, 32271, 49359, 33690}
+              -- Darnassus (11419), Exodar (32266) Theramore (49360) Ironforge (11416) Stormwind (10059), Shattrath (33691)
+		PortalSpells   = {11419, 32266, 49360, 11416, 10059, 33691} -- {11419, 10059, 11416, 32266, 49360, 33691}
+	else
+              -- Silvermoon (32272), Undercity (3563), Thunder Bluff (3566), Stonard (49358), Orgrimmar (3567), Shattrath (35715)
+		TeleportSpells = {32272, 3563, 3566, 49358, 3567, 35715} -- {3566, 3563, 3567, 32272, 49358, 35715}
+              -- Silvermoon (32267), Undercity (11418), Thunder Bluff (11420), Stonard (49361), Orgrimmar (11417), Shattrath (35717)
+		PortalSpells   = {32267, 11418, 11420, 49361, 11417, 35717} -- {11420, 11418, 11417, 32267, 49361, 35717}
 	end
+	GemSpells = {759, 3552, 10053, 10054, 27101}
+    -- pig, turtle, ???
+    PolymorphSpells = {28272, 28271, 28270}  -- REM: insert basic sheep a little later
+
+    -- Immediately load spell data (for rank info) so it'll be available a little later to create the addon buttons
+    preload_spell_data(WaterSpells)
+    preload_spell_data(FoodSpells)
+    preload_spell_data(TeleportSpells)
+    preload_spell_data(PortalSpells)
+    preload_spell_data(GemSpells)
+    preload_spell_data(PolymorphSpells)
+    preload_spell_data({12826, 12825, 12824, 118}) -- Basic sheep spell ranks
+
+	-- Needs a slight delay on initial startup to allow for spell data to load
+	C_Timer.After(6, function()
+
+		-- Choose the highest rank of sheep polymorph
+        local sheep = 9999 -- A spell you will never know
+
+		if     IsSpellKnown(12826) then sheep = 12826   -- rank 4
+		elseif IsSpellKnown(12825) then sheep = 12825   -- rank 3
+		elseif IsSpellKnown(12824) then sheep = 12824   -- rank 2
+		elseif IsSpellKnown(118)   then sheep = 118     -- rank 1
+           end
+		table.insert(PolymorphSpells, 1, sheep)
+
+        -- Create the various spell tables using helper function
+        WaterTable     = make_spell_table(WaterSpells)
+        FoodTable      = make_spell_table(FoodSpells)
+        TeleportsTable = make_spell_table(TeleportSpells)
+        PortalsTable   = make_spell_table(PortalSpells)
+        GemsTable      = make_spell_table(GemSpells)
+        PolymorphTable = make_spell_table(PolymorphSpells)
+			
+		-- Get saved frame location
+		local relPoint, anchorX, anchorY = addon:getAnchorPosition()
+		MageButtonsConfig:ClearAllPoints()
+		MageButtonsConfig:SetPoint(relPoint, UIParent, relPoint, anchorX, anchorY)
+		
+		
+		addon:makeBaseButtons()
+
+		-----------------
+		-- Data Broker --
+		-----------------
+		lockStatus = addon:getSV("framelock", "lock")
+		
+		db = LibStub("AceDB-3.0"):New("MageButtonsDB", SettingsDefaults)
+		MageButtonsDB.db = db;
+		MageButtonsMinimapData = ldb:NewDataObject("MageButtons",{
+			type = "data source",
+			text = "MageButtons",
+			icon = "Interface/Icons/Spell_Holy_MagicalSentry.blp",
+			OnClick = function(self, button)
+				if button == "RightButton" then
+					if IsShiftKeyDown() then
+						MageButtons:maptoggle("0")
+						print("MageButtons: Hiding icon, re-enable with: /MageButtons minimap 1")
+					else
+						InterfaceOptionsFrame_OpenToCategory(mbPanel)
+						InterfaceOptionsFrame_OpenToCategory(mbPanel)
+						InterfaceOptionsFrame_OpenToCategory(mbPanel)
+					end
+				
+				elseif button == "LeftButton" then
+					if lockStatus == 0 then
+						-- Not locked, lock it and save the anchor position
+						addon:lockAnchor()
+					else
+						-- locked, unlock
+						addon:unlockAnchor()
+					end
+				end
+			end,
+			
+			-- Minimap Icon tooltip
+			OnTooltipShow = function(tooltip)
+				tooltip:AddLine("|cffffffffMageButtons|r\nLeft-click to lock/unlock.\nRight-click to configure.\nShift+Right-click to hide minimap button.")
+			end,
+		})
+
+		-- display the minimap icon?
+		local mmap = addon:getSV("minimap", "icon") or 1
+		if mmap == 1 then
+			MageButtonsMinimapIcon:Register("mageButtonsIcon", MageButtonsMinimapData, MageButtonsDB)
+			addon:maptoggle(1)
+		else
+			addon:maptoggle(0)
+		end
+	end); --end of slight delay
 end
 
 -------------------------------
@@ -347,7 +354,7 @@ function addon:makeBaseButtons()
 
 	-- These store the menu state for each button (0 = closed, 1 = open)
 	WaterMenu, FoodMenu, TeleportsMenu, PortalsMenu, GemsMenu, PolymorphMenu = 0, 0, 0, 0, 0, 0
-	
+
 	-- Pull items from Saved Variables
 	growthDir = addon:getSV("growth", "direction") or "Horizontal"
 	menuDir = addon:getSV("growth", "buttons") or "Up"
@@ -475,7 +482,7 @@ function addon:makeBaseButtons()
 			baseButtonBackdrops[btnType].texture:SetAllPoints(baseButtonBackdrops[btnType])
 			baseButtonBackdrops[btnType]:SetBackdrop({bgFile = "Interface\\ChatFrame\\ChatFrameBackground"})
 			baseButtonBackdrops[btnType]:SetBackdropColor(backdropRed, backdropGreen, backdropBlue, backdropAlpha)
-			
+
 			if mouseover == 1 then
 				baseButtonBackdrops[btnType]:SetScript("OnEnter",function(self,motion)
 					-- Display menu on mouseover
